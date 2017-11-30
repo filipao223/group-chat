@@ -10,14 +10,23 @@
 #include <signal.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <signal.h>
 
 #include "structs.h"
 #include "linkedList.h"
 
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
 void* acceptClient(void*);
 void erro(char *msg);
 
+void cleanup(int signum){
+  pthread_mutex_destroy(&mutex);
+  exit(0);
+}
+
 int main(int argc, char *argv[]){
+  signal(SIGINT, cleanup);
   struct sockaddr_in addr, client_addr;
   //Cria cabeça da lista ligada
   client* head = malloc(sizeof(client));
@@ -56,21 +65,28 @@ int main(int argc, char *argv[]){
   //Select
   fd_set read_set;
   char str[MAX_BUFFER];
+  int nread,i=0;
   while(1){
+    i=0;
     current = NULL;
     FD_ZERO(&read_set);
     for(current = head->next; current->next!=NULL; current = current->next) FD_SET(current->fd, &read_set);
     FD_SET(current->fd, &read_set);
 
-    if(select(current->fd, &read_set,0,0,0) > 0){
+    if(select(current->fd+1, &read_set,0,0,0) > 0){
       for(current = head->next; current!=NULL; current = current->next){
+        //printf("Iteraçao %d\n",i++);
         if(FD_ISSET(current->fd, &read_set)){
-          if(read(current->fd, str, sizeof(str)) == -1){
+          if((nread = read(current->fd, str, sizeof(str))) == -1){
             printf("Erro.Cliente terminou conexao.\n");
+            pthread_mutex_lock(&mutex);
             remove_from_list(head, current->fd);
+            pthread_mutex_unlock(&mutex);
             break;
           }
+          str[nread] = '\0';
           printf("%s: %s\n", current->nome, str);
+          break;
         }
       }
     }
@@ -87,7 +103,9 @@ void* acceptClient(void* args){
   while(1){
     fd = accept(args_ptr->fd, (struct sockaddr*)&client_addr, (socklen_t*)&client_addr_size);
     printf("Novo cliente conectado.\n");
+    pthread_mutex_lock(&mutex);
     add_to_list(args_ptr->head, fd, "nome", client_addr);
+    pthread_mutex_unlock(&mutex);
   }
 }
 
