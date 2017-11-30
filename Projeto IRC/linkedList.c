@@ -1,0 +1,45 @@
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <netdb.h>
+#include <string.h>
+
+#include "structs.h"
+#include "linkedList.h"
+
+void add_to_list(client* head, int fd, char nome[MAX_NOME], struct sockaddr_in client_addr){
+  client* current, *last;
+
+  //Se for o primeiro clientes
+  if(head->next == NULL){
+    head->next = malloc(sizeof(client));
+    head->next->fd = fd;
+    head->next->client_addr = client_addr;
+    head->next->next = NULL;
+  }
+  else{
+    //Não é o primeiro, percorre a lista até ao fim
+    for(current = head->next; current!=NULL; current = current->next) last = current;
+
+    last->next = malloc(sizeof(client));
+    last->next->fd = fd;
+    strcpy(last->next->nome, nome);
+    last->next->client_addr = client_addr;
+    last->next->next = NULL;
+  }
+}
+
+void remove_from_list(client* head, int fd){
+  client* current, *previous = head, *next;
+
+  for(current = head->next; current!=NULL; next = current->next){
+    if(current->fd == fd){
+      previous->next = next;
+    }
+    previous = current;
+  }
+}
