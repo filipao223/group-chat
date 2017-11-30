@@ -84,9 +84,11 @@ int main(int argc, char *argv[]){
             pthread_mutex_unlock(&mutex);
             break;
           }
-          str[nread] = '\0';
-          printf("%s: %s\n", current->nome, str);
-          break;
+          else{
+            str[nread] = '\0';
+            printf("%s: %s\n", current->nome, str);
+            break;
+          }
         }
       }
     }
