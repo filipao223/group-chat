@@ -22,6 +22,13 @@ void* acceptClient(void*);
 void erro(char *msg);
 
 void cleanup(int signum){
+  /*client* current, *next;
+  for(current = head->next; next!=NULL;){ //Limpa memoria
+    next = current->next;
+    free(current);
+  }*/
+  printf("\n\nA fechar servidor\n\n");
+  sleep(1);
   pthread_mutex_destroy(&mutex);
   exit(0);
 }
@@ -29,6 +36,7 @@ void cleanup(int signum){
 int main(int argc, char *argv[]){
   signal(SIGINT, cleanup);
   struct sockaddr_in addr, client_addr;
+
   //Cria cabeça da lista ligada
   client* head = malloc(sizeof(client));
   client* current;
@@ -48,6 +56,8 @@ int main(int argc, char *argv[]){
   addr.sin_port = htons(SERVER_PORT);
 
   if ( (fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) erro("na funcao socket");
+  int var;
+  setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &var, sizeof(int));
   if ( bind(fd,(struct sockaddr*)&addr,sizeof(addr)) < 0) erro("na funcao bind");
   if( listen(fd, 5) < 0) erro("na funcao listen");
 
@@ -57,23 +67,30 @@ int main(int argc, char *argv[]){
   //Thread que vai aceitar os clientes
   pthread_create(&accept_thread, 0, acceptClient, (void*)args);
 
-  //Espera que haja pelo menos um cliente
-  while(1){
-    if(head->next != NULL) break;
-    sleep(2);
-  }
-
   //Select
-  fd_set read_set;
   char str[MAX_BUFFER];
   int nread,close_client=0;
   while(1){
+    fd_set read_set;
+    //Espera que haja pelo menos um cliente
+    #ifndef DEBUG
+    printf("A entrar no ciclo de head->next!=null\n");
+    #endif
+    while(1){
+      if(head->next != NULL) break;
+      sleep(2);
+    }
     close_client=0;
     current = NULL;
     FD_ZERO(&read_set);
+    #ifndef DEBUG
+    printf("Ciclo dos FD_SET's\n");
+    #endif
     for(current = head->next; current->next!=NULL; current = current->next) FD_SET(current->fd, &read_set);
     FD_SET(current->fd, &read_set);
-
+    #ifndef DEBUG
+    printf("A entrar no select\n");
+    #endif
     if(select(current->fd+1, &read_set,0,0,0) > 0){
       for(current = head->next; current!=NULL; current = current->next){
         if(FD_ISSET(current->fd, &read_set)){
@@ -91,12 +108,26 @@ int main(int argc, char *argv[]){
         }
       }
     }
+    #ifndef DEBUG
+    printf("Saiu do select\n");
+    #endif
     if(close_client == 1){
-      //close(current->fd);
-      pthread_mutex_lock(&mutex);
+      #ifndef DEBUG
+      printf("Tentando fechar\n");
+      #endif
+      close(current->fd);
+      #ifndef DEBUG
+      printf("Fechou\n");
+      printf("Tenta clr\n");
+      #endif
       FD_CLR(current->fd, &read_set);
+      #ifndef DEBUG
+      printf("Tenta remover da lista\n");
+      #endif
       remove_from_list(head, current->fd);
-      pthread_mutex_unlock(&mutex);
+      #ifndef DEBUG
+      printf("Removeu da lista\n");
+      #endif
     }
   }
 }

@@ -34,12 +34,15 @@ void add_to_list(client* head, int fd, char nome[MAX_NOME], struct sockaddr_in c
 }
 
 void remove_from_list(client* head, int fd){
-  client* current, *previous = head, *next;
+  client* current, *previous = head, *next = head->next->next;
 
   for(current = head->next; current!=NULL; next = current->next){
     if(current->fd == fd){
       previous->next = next;
+      free(current);
+      break;
     }
     previous = current;
+    current = next;
   }
 }

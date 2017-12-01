@@ -1,5 +1,5 @@
-CFLAGS = -g -Wall -D_REENTRANT -pthread -c
-CFLAGSF = -g -Wall -D_REENTRANT -pthread -o
+CFLAGS = -g -Wall -D_REENTRANT -pthread -DDEBUG=0 -c
+CFLAGSF = -g -Wall -D_REENTRANT -pthread -DDEBUG=0 -o
 CC = gcc
 
 server: server.o linkedList.o
