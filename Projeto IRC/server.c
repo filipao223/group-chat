@@ -11,6 +11,7 @@
 #include <fcntl.h>
 #include <pthread.h>
 #include <signal.h>
+#include <errno.h>
 
 #include "structs.h"
 #include "linkedList.h"
@@ -65,9 +66,9 @@ int main(int argc, char *argv[]){
   //Select
   fd_set read_set;
   char str[MAX_BUFFER];
-  int nread,i=0;
+  int nread,close_client=0;
   while(1){
-    i=0;
+    close_client=0;
     current = NULL;
     FD_ZERO(&read_set);
     for(current = head->next; current->next!=NULL; current = current->next) FD_SET(current->fd, &read_set);
@@ -75,22 +76,27 @@ int main(int argc, char *argv[]){
 
     if(select(current->fd+1, &read_set,0,0,0) > 0){
       for(current = head->next; current!=NULL; current = current->next){
-        //printf("Iteraçao %d\n",i++);
         if(FD_ISSET(current->fd, &read_set)){
-          if((nread = read(current->fd, str, sizeof(str))) == -1){
-            printf("Erro.Cliente terminou conexao.\n");
-            pthread_mutex_lock(&mutex);
-            remove_from_list(head, current->fd);
-            pthread_mutex_unlock(&mutex);
+          nread = read(current->fd, str, sizeof(str));
+          str[nread] = '\0';
+          if(strcmp(str, "exit") == 0){
+            printf("Cliente terminou conexao.\n");
+            close_client=1;
             break;
-          }
+            }
           else{
-            str[nread] = '\0';
             printf("%s: %s\n", current->nome, str);
             break;
           }
         }
       }
+    }
+    if(close_client == 1){
+      //close(current->fd);
+      pthread_mutex_lock(&mutex);
+      FD_CLR(current->fd, &read_set);
+      remove_from_list(head, current->fd);
+      pthread_mutex_unlock(&mutex);
     }
   }
 }

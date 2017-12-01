@@ -62,11 +62,13 @@ void* writeMessages(void* fd){
   while(1){
     fgets(buf, MAX_BUFFER, stdin);
     buf[strlen(buf)-1] = '\0';
-    //Verifica se pretende acabar a conexao
-    if(strcmp(buf, "exit") == 0) pthread_exit(NULL);
-
     write(*server_fd, buf, sizeof(buf));
-    printf("Escreveu\n");
+    //Verifica se pretende acabar a conexao
+    if(strcmp(buf, "exit") == 0){
+      printf("A sair\n");
+      sleep(4);
+      pthread_exit(NULL);
+    }
   }
 }
 
