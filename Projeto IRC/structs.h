@@ -5,6 +5,7 @@
 #define MAX_BUFFER 1024
 #define MAX_CLIENTS 10
 #define MAX_NOME 256
+#define MAX_MESSAGES 200
 
 //Lista ligada
 typedef struct client_node{

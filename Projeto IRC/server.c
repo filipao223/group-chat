@@ -102,9 +102,9 @@ int main(int argc, char *argv[]){
             close_client=1;
             break;
             }
+          else if(strcmp(str, "commands")==0) break;
           else{
             printf("%s: %s\n", current->nome, str);
-            printf("Entrou sendToAll\n");
             sendToAll(head, current, current->fd, str);
             break;
           }

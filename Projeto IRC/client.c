@@ -17,14 +17,14 @@
 void* writeMessages(void*);
 void* readMessages(void*);
 void* threadWatch();
+void options(int);
 void erro(char *msg);
 
-//pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-//pthread_cond_t cond_var = PTHREAD_COND_INITIALIZER;
-
 char bufOut[MAX_BUFFER];
+char messageHistory[MAX_MESSAGES][MAX_BUFFER];
+int messageCount=0;
 
-pthread_t thread_read, thread_write;// thread_watch;
+pthread_t thread_read, thread_write;
 
 int main(int argc, char *argv[]){
   char endServer[100];
@@ -61,13 +61,8 @@ int main(int argc, char *argv[]){
 
   //Thread para ler mensagens
   pthread_create(&thread_read, 0, readMessages, (void*) fd);
-
-  //Thread para monitorizar se o cliente pretende sair
-  //pthread_create(&thread_watch, 0, threadWatch,0);
-
   pthread_join(thread_write, 0);
-  //pthread_join(thread_watch, 0);
-  //pthread_mutex_destroy(&mutex);
+
   printf("A fechar conexao.");
 
   close(*fd);
@@ -80,13 +75,20 @@ void* writeMessages(void* fd){
   while(1){
     fgets(bufOut, MAX_BUFFER, stdin);
     bufOut[strlen(bufOut)-1] = '\0';
+    //Verifica se pretende fazer outras operaçoes
+    if(strcmp(bufOut, "commands") == 0){
+      printf("OPCOES:\n\t1. Ver historico de mensagens\n\t2.Voltar");
+      int esc=-1;
+      while(esc<=0||esc>2){
+        scanf("%d", &esc);
+      }
+      options(esc);
+    }
     write(*server_fd, bufOut, sizeof(bufOut));
     //Verifica se pretende acabar a conexao
     if(strcmp(bufOut, "exit") == 0){
       printf("A sair\n");
-      //pthread_cond_signal(&cond_var);
       pthread_kill(thread_read, SIGTERM);
-      sleep(4);
       pthread_exit(NULL);
     }
   }
@@ -98,19 +100,32 @@ void* readMessages(void* fd){
   char bufIn[MAX_BUFFER];
 
   while(1){
-    //pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
     read(*server_fd, bufIn, sizeof(bufIn));
-    printf("Cliente leu\n");
     printf("%s\n", bufIn);
-    //pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldstate);
+    strcpy(messageHistory[messageCount], bufIn); //Adiciona ao historico de mensagens
+    messageCount++;
   }
 }
 
-/*void* threadWatch(){
-  pthread_cond_wait(&cond_var, &mutex);
-  pthread_cancel(thread_read);
-  pthread_exit(NULL);
-}*/
+void options(int esc){
+  switch(esc){
+    case 1:
+      printf("Numero de mensagens a ver (entre 1 e 200): ");
+      int num;
+      while(num<=0 || num>200){
+        scanf("%d", &num);
+      }
+      for(int i=0; i<messageCount; i++){
+        if(i==num) break;
+        printf("%s\n", messageHistory[i]);
+      }
+      printf("Fim do historico\n");
+      break;
+
+    case 2:
+      break;
+  }
+}
 
 void erro(char *msg)
 {
