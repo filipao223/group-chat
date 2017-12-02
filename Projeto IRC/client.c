@@ -17,11 +17,12 @@
 void* writeMessages(void*);
 void* readMessages(void*);
 void* threadWatch();
-void options(int);
+void options(int, int*);
 void erro(char *msg);
 
 char bufOut[MAX_BUFFER];
 char messageHistory[MAX_MESSAGES][MAX_BUFFER];
+char controlChar[1];
 int messageCount=0;
 
 pthread_t thread_read, thread_write;
@@ -64,39 +65,46 @@ int main(int argc, char *argv[]){
   pthread_join(thread_write, 0);
 
   printf("A fechar conexao.");
-
   close(*fd);
+
   exit(0);
 }
 
 void* writeMessages(void* fd){
   int* server_fd = (int*) fd;
+  char buf[MAX_BUFFER];
 
   while(1){
-    fgets(bufOut, MAX_BUFFER, stdin);
-    bufOut[strlen(bufOut)-1] = '\0';
+    strcpy(controlChar, "0");
+    fgets(buf, MAX_BUFFER, stdin);
+    buf[strlen(buf)-1] = '\0';
+
     //Verifica se pretende fazer outras operaçoes
-    if(strcmp(bufOut, "commands") == 0){
-      printf("OPCOES:\n\t1. Ver historico de mensagens\n\t2.Voltar");
-      int esc=-1;
-      while(esc<=0||esc>2){
-        scanf("%d", &esc);
-      }
-      options(esc);
+    if(strcmp(buf, "command_history") == 0){
+      options(1, 0);
     }
-    write(*server_fd, bufOut, sizeof(bufOut));
-    //Verifica se pretende acabar a conexao
-    if(strcmp(bufOut, "exit") == 0){
-      printf("A sair\n");
-      pthread_kill(thread_read, SIGTERM);
-      pthread_exit(NULL);
+    else if(strcmp(buf, "command_private") == 0){
+      options(2, server_fd);
+    }
+    else{
+      strcpy(bufOut, ""); //Para o servidor saber se a mensagem é privada ou nao
+      strcat(bufOut, controlChar); //Control char é 0 se nao for, 1 se for
+      strcat(bufOut, "_"); //servidor tera que fazer splits, se for privada, faz mais um split do que se nao for
+      strcat(bufOut, buf);
+
+      write(*server_fd, bufOut, sizeof(bufOut));
+      //Verifica se pretende acabar a conexao
+      if(strcmp(bufOut, "0_exit") == 0){
+        printf("A sair\n");
+        pthread_kill(thread_read, SIGTERM);
+        pthread_exit(NULL);
+      }
     }
   }
 }
 
 void* readMessages(void* fd){
   int* server_fd = (int*) fd;
-  int oldstate=0;
   char bufIn[MAX_BUFFER];
 
   while(1){
@@ -107,7 +115,11 @@ void* readMessages(void* fd){
   }
 }
 
-void options(int esc){
+void options(int esc, int* server_fd){
+  char nomeDest[MAX_NOME];
+  char buf[MAX_BUFFER];
+  char message[MAX_BUFFER+MAX_NOME];
+
   switch(esc){
     case 1:
       printf("Numero de mensagens a ver (entre 1 e 200): ");
@@ -123,6 +135,23 @@ void options(int esc){
       break;
 
     case 2:
+      strcpy(controlChar, "1");
+
+      printf("Nome do destinatario: ");
+      fgets(nomeDest, MAX_NOME, stdin);
+      nomeDest[strlen(nomeDest)-1]= '\0';
+      printf("Mensagem: ");
+      fgets(buf, MAX_BUFFER, stdin);
+      buf[strlen(buf)-1]= '\0';
+
+      strcpy(message, "");
+      strcat(message, controlChar);
+      strcat(message, "_");
+      strcat(message, buf);
+      strcat(message, "_");
+      strcat(message, nomeDest);
+
+      write(*server_fd, message, sizeof(message));
       break;
   }
 }

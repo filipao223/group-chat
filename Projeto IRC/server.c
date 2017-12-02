@@ -21,6 +21,7 @@ pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 void* acceptClient(void*);
 void erro(char *msg);
 void sendToAll(client*, client*, int, char*);
+void* sendToOne(client*, client*, char*, int, char*);
 
 void cleanup(int signum){
   /*client* current, *next;
@@ -97,16 +98,35 @@ int main(int argc, char *argv[]){
         if(FD_ISSET(current->fd, &read_set)){
           nread = read(current->fd, str, sizeof(str));
           str[nread] = '\0';
-          if(strcmp(str, "exit") == 0){
-            printf("%s terminou conexao.\n", current->nome);
-            close_client=1;
+
+          char *tokens;
+          tokens = strtok(str, "_");
+          if(tokens == NULL) break;
+          if(strcmp(tokens, "1")==0){
+            //Conversa privada
+            tokens = strtok(NULL, "_");
+            char strToSend[MAX_BUFFER];
+            strcpy(strToSend, tokens);
+            tokens = strtok(NULL, "_");
+            char nomeDest[MAX_NOME];
+            strcpy(nomeDest, tokens);
+            sendToOne(head, current, nomeDest, current->fd, strToSend);
             break;
-            }
-          else if(strcmp(str, "commands")==0) break;
+          }
           else{
-            printf("%s: %s\n", current->nome, str);
-            sendToAll(head, current, current->fd, str);
-            break;
+            tokens= strtok(NULL, "_");
+            if(tokens==NULL) break;
+            //Não é privada
+            if(strcmp(tokens, "exit") == 0){
+              printf("%s terminou conexao.\n", current->nome);
+              close_client=1;
+              break;
+              }
+            else{
+              printf("%s: %s\n", current->nome, tokens);
+              sendToAll(head, current, current->fd, tokens);
+              break;
+            }
           }
         }
       }
@@ -162,6 +182,20 @@ void sendToAll(client* head, client* user, int fd, char str[MAX_BUFFER]){
     if(current->fd == fd) continue;
     write(current->fd, message, sizeof(message));
   }
+}
+
+void* sendToOne(client* head, client* user, char dest[MAX_NOME], int fd, char str[MAX_BUFFER]){
+  client* current;
+  char message[MAX_BUFFER];
+  sprintf(message, "P %s: %s", user->nome, str);
+  for(current = head->next; current!=NULL; current = current->next){
+    if(current->fd == fd) continue;
+    if(strcmp(current->nome, dest) == 0){
+      write(current->fd, message, sizeof(message));
+      return 0;
+    }
+  }
+  return 0;
 }
 
 void erro(char *msg)
