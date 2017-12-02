@@ -19,6 +19,7 @@ void add_to_list(client* head, int fd, char nome[MAX_NOME], struct sockaddr_in c
     head->next = malloc(sizeof(client));
     head->next->fd = fd;
     head->next->client_addr = client_addr;
+    strcpy(head->next->nome, nome);
     head->next->next = NULL;
   }
   else{

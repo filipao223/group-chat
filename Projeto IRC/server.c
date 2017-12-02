@@ -20,6 +20,7 @@ pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void* acceptClient(void*);
 void erro(char *msg);
+void sendToAll(client*, client*, int, char*);
 
 void cleanup(int signum){
   /*client* current, *next;
@@ -97,12 +98,14 @@ int main(int argc, char *argv[]){
           nread = read(current->fd, str, sizeof(str));
           str[nread] = '\0';
           if(strcmp(str, "exit") == 0){
-            printf("Cliente terminou conexao.\n");
+            printf("%s terminou conexao.\n", current->nome);
             close_client=1;
             break;
             }
           else{
             printf("%s: %s\n", current->nome, str);
+            printf("Entrou sendToAll\n");
+            sendToAll(head, current, current->fd, str);
             break;
           }
         }
@@ -135,16 +138,29 @@ int main(int argc, char *argv[]){
 void* acceptClient(void* args){
   struct sockaddr_in client_addr;
   int client_addr_size = sizeof(client_addr);
+  char nome[MAX_NOME];
 
   thread_args* args_ptr = (thread_args*)args;
 
   int fd;
   while(1){
     fd = accept(args_ptr->fd, (struct sockaddr*)&client_addr, (socklen_t*)&client_addr_size);
-    printf("Novo cliente conectado.\n");
+    int nread = read(fd, nome, sizeof(nome));
+    nome[nread]= '\0';
+    printf("Novo cliente conectado - %s\n", nome);
     pthread_mutex_lock(&mutex);
-    add_to_list(args_ptr->head, fd, "nome", client_addr);
+    add_to_list(args_ptr->head, fd, nome, client_addr);
     pthread_mutex_unlock(&mutex);
+  }
+}
+
+void sendToAll(client* head, client* user, int fd, char str[MAX_BUFFER]){
+  client* current;
+  char message[MAX_BUFFER];
+  sprintf(message,"%s: %s", user->nome, str);
+  for(current = head->next; current!=NULL; current = current->next){
+    if(current->fd == fd) continue;
+    write(current->fd, message, sizeof(message));
   }
 }
 

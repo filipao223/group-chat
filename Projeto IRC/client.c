@@ -15,19 +15,28 @@
 #include "linkedList.h"
 
 void* writeMessages(void*);
+void* readMessages(void*);
+void* threadWatch();
 void erro(char *msg);
+
+//pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+//pthread_cond_t cond_var = PTHREAD_COND_INITIALIZER;
+
+char bufOut[MAX_BUFFER];
+
+pthread_t thread_read, thread_write;// thread_watch;
 
 int main(int argc, char *argv[]){
   char endServer[100];
   int *fd = malloc(sizeof(int));
 
-  pthread_t thread_read, thread_write;
-
   struct sockaddr_in addr;
   struct hostent *hostPtr;
 
-  if(argc != 3){
-   printf("cliente <host> <port>\n");
+  signal(SIGINT, SIG_IGN);
+
+  if(argc != 4){
+   printf("cliente <host> <port> <nome>\n");
    exit(-1);
   }
 
@@ -44,11 +53,21 @@ int main(int argc, char *argv[]){
   if( connect(*fd,(struct sockaddr *)&addr,sizeof (addr)) < 0) erro("Connect");
   printf("Conectado.\n");
 
+  write(*fd, argv[3], sizeof(argv[3]));
+
   //Thread para escrever mensagens
   printf("Waiting for input...\n");
   pthread_create(&thread_write, 0, writeMessages, (void*) fd);
 
+  //Thread para ler mensagens
+  pthread_create(&thread_read, 0, readMessages, (void*) fd);
+
+  //Thread para monitorizar se o cliente pretende sair
+  //pthread_create(&thread_watch, 0, threadWatch,0);
+
   pthread_join(thread_write, 0);
+  //pthread_join(thread_watch, 0);
+  //pthread_mutex_destroy(&mutex);
   printf("A fechar conexao.");
 
   close(*fd);
@@ -57,20 +76,41 @@ int main(int argc, char *argv[]){
 
 void* writeMessages(void* fd){
   int* server_fd = (int*) fd;
-  char buf[MAX_BUFFER];
 
   while(1){
-    fgets(buf, MAX_BUFFER, stdin);
-    buf[strlen(buf)-1] = '\0';
-    write(*server_fd, buf, sizeof(buf));
+    fgets(bufOut, MAX_BUFFER, stdin);
+    bufOut[strlen(bufOut)-1] = '\0';
+    write(*server_fd, bufOut, sizeof(bufOut));
     //Verifica se pretende acabar a conexao
-    if(strcmp(buf, "exit") == 0){
+    if(strcmp(bufOut, "exit") == 0){
       printf("A sair\n");
+      //pthread_cond_signal(&cond_var);
+      pthread_kill(thread_read, SIGTERM);
       sleep(4);
       pthread_exit(NULL);
     }
   }
 }
+
+void* readMessages(void* fd){
+  int* server_fd = (int*) fd;
+  int oldstate=0;
+  char bufIn[MAX_BUFFER];
+
+  while(1){
+    //pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, &oldstate);
+    read(*server_fd, bufIn, sizeof(bufIn));
+    printf("Cliente leu\n");
+    printf("%s\n", bufIn);
+    //pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, &oldstate);
+  }
+}
+
+/*void* threadWatch(){
+  pthread_cond_wait(&cond_var, &mutex);
+  pthread_cancel(thread_read);
+  pthread_exit(NULL);
+}*/
 
 void erro(char *msg)
 {
