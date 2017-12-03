@@ -22,6 +22,7 @@ void* acceptClient(void*);
 void erro(char *msg);
 void sendToAll(client*, client*, int, char*);
 void* sendToOne(client*, client*, char*, int, char*);
+void requestNames(client*, int);
 
 void cleanup(int signum){
   /*client* current, *next;
@@ -102,6 +103,7 @@ int main(int argc, char *argv[]){
           char *tokens;
           tokens = strtok(str, "_");
           if(tokens == NULL) break;
+
           if(strcmp(tokens, "1")==0){
             //Conversa privada
             tokens = strtok(NULL, "_");
@@ -122,6 +124,11 @@ int main(int argc, char *argv[]){
               close_client=1;
               break;
               }
+            else if(strcmp(tokens, "requestnames") == 0){
+              printf("Names Requested\n");
+              requestNames(head, current->fd);
+              break;
+            }
             else{
               printf("%s: %s\n", current->nome, tokens);
               sendToAll(head, current, current->fd, tokens);
@@ -196,6 +203,16 @@ void* sendToOne(client* head, client* user, char dest[MAX_NOME], int fd, char st
     }
   }
   return 0;
+}
+
+void requestNames(client* head, int fd){
+  char names[MAX_BUFFER*MAX_NOME]; strcpy(names, "");
+  client* current=NULL;
+  for(current = head->next; current!=NULL; current = current->next){
+    strcat(names, current->nome);
+    if(current->next != NULL) strcat(names, "_");
+  }
+  write(fd, names, sizeof(names));
 }
 
 void erro(char *msg)

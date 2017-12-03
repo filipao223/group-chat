@@ -15,9 +15,24 @@ typedef struct client_node{
   struct client_node* next;
 }client;
 
-typedef struct info{
+typedef struct thread_args_accept{
   int fd;
   client* head;
 }thread_args;
+
+typedef struct thread_args_msg_delay{
+  int fd, seconds;
+  char str[MAX_BUFFER];
+}thread_args_delay;
+
+typedef struct block_list_node{
+  char nome[MAX_NOME];
+  struct block_list_node* next;
+}block_list;
+
+typedef struct thread_args_msg_write{
+  int fd;
+  char argv[MAX_NOME];
+}thread_args_write;
 
 #endif //STRUCTS_H

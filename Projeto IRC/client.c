@@ -16,16 +16,20 @@
 
 void* writeMessages(void*);
 void* readMessages(void*);
-void* threadWatch();
-void options(int, int*);
+void* writeDelay(void*);
+void options(int, int);
+void blockUser(char*);
 void erro(char *msg);
 
 char bufOut[MAX_BUFFER];
 char messageHistory[MAX_MESSAGES][MAX_BUFFER];
+char names[MAX_BUFFER*MAX_NOME];
 char controlChar[1];
 int messageCount=0;
 
-pthread_t thread_read, thread_write;
+pthread_t thread_read, thread_write, thread_delay;
+
+block_list* head = NULL;
 
 int main(int argc, char *argv[]){
   char endServer[100];
@@ -56,9 +60,18 @@ int main(int argc, char *argv[]){
 
   write(*fd, argv[3], sizeof(argv[3]));
 
+  //Inicia a lista de utilizadores bloqueados
+  head = malloc(sizeof(block_list));
+  head->next = NULL;
+
+  //Argumentos da thread para escrever mensganes
+  thread_args_write* args = malloc(sizeof(thread_args_write));
+  args->fd = *fd;
+  strcpy(args->argv, argv[3]);
+
   //Thread para escrever mensagens
   printf("Waiting for input...\n");
-  pthread_create(&thread_write, 0, writeMessages, (void*) fd);
+  pthread_create(&thread_write, 0, writeMessages, (void*) args);
 
   //Thread para ler mensagens
   pthread_create(&thread_read, 0, readMessages, (void*) fd);
@@ -70,9 +83,12 @@ int main(int argc, char *argv[]){
   exit(0);
 }
 
-void* writeMessages(void* fd){
-  int* server_fd = (int*) fd;
+void* writeMessages(void* args){
+  thread_args_write* ptr = (thread_args_write*) args;
+  int server_fd = ptr->fd;
   char buf[MAX_BUFFER];
+  char argv[MAX_NOME];
+  strcpy(argv, ptr->argv);
 
   while(1){
     strcpy(controlChar, "0");
@@ -86,13 +102,27 @@ void* writeMessages(void* fd){
     else if(strcmp(buf, "command_private") == 0){
       options(2, server_fd);
     }
+    else if(strcmp(buf, "command_delay") == 0){
+      options(3, server_fd);
+    }
+    else if(strcmp(buf, "command_block") == 0){
+      strcpy(names,"");
+      strcpy(bufOut, ""); strcat(bufOut, controlChar); strcat(bufOut, "_"); strcat(bufOut, "requestnames");
+
+      write(server_fd, bufOut, sizeof(bufOut));
+      printf("Antes do read\n");
+      read(server_fd, names, sizeof(names));
+      printf("Depois do read\n");
+
+      blockUser(argv);
+    }
     else{
       strcpy(bufOut, ""); //Para o servidor saber se a mensagem é privada ou nao
       strcat(bufOut, controlChar); //Control char é 0 se nao for, 1 se for
       strcat(bufOut, "_"); //servidor tera que fazer splits, se for privada, faz mais um split do que se nao for
       strcat(bufOut, buf);
 
-      write(*server_fd, bufOut, sizeof(bufOut));
+      write(server_fd, bufOut, sizeof(bufOut));
       //Verifica se pretende acabar a conexao
       if(strcmp(bufOut, "0_exit") == 0){
         printf("A sair\n");
@@ -105,20 +135,30 @@ void* writeMessages(void* fd){
 
 void* readMessages(void* fd){
   int* server_fd = (int*) fd;
-  char bufIn[MAX_BUFFER];
+  char bufIn[MAX_BUFFER+MAX_NOME], temp[MAX_BUFFER+MAX_NOME];
 
   while(1){
     read(*server_fd, bufIn, sizeof(bufIn));
+    strcpy(temp, bufIn);
+
+    //Verifica se o user esta bloqueado
+    char* tokens = strtok(temp, ":");
+    if(tokens!=NULL){
+      if(check_block(head, tokens) == 1) continue;
+    }
+
     printf("%s\n", bufIn);
     strcpy(messageHistory[messageCount], bufIn); //Adiciona ao historico de mensagens
     messageCount++;
   }
 }
 
-void options(int esc, int* server_fd){
+void options(int esc, int server_fd){
   char nomeDest[MAX_NOME];
   char buf[MAX_BUFFER];
   char message[MAX_BUFFER+MAX_NOME];
+  int delay_time=-1;
+  char temp[2];
 
   switch(esc){
     case 1:
@@ -151,8 +191,72 @@ void options(int esc, int* server_fd){
       strcat(message, "_");
       strcat(message, nomeDest);
 
-      write(*server_fd, message, sizeof(message));
+      write(server_fd, message, sizeof(message));
       break;
+
+    case 3:
+      printf("Tempo: ");
+      while(delay_time<1){
+          fgets(temp, 10, stdin);
+          sscanf(temp, "%d", &delay_time);
+      }
+      printf("Mensagem: ");
+      fgets(buf, MAX_BUFFER, stdin);
+      buf[strlen(buf)-1] = '\0';
+
+      thread_args_delay* args = malloc(sizeof(thread_args_delay));
+
+      args->fd = server_fd;
+      args->seconds = delay_time;
+      strcpy(args->str, buf);
+
+      pthread_create(&thread_delay, 0, writeDelay, (void*) args);
+      pthread_join(thread_delay, 0);
+      break;
+  }
+}
+
+void* writeDelay(void* args){
+  thread_args_delay *ptr = (thread_args_delay*) args;
+  int delay_time = ptr->seconds;
+  int fd = ptr->fd;
+  char str[MAX_BUFFER];
+  strcpy(str, ptr->str);
+
+  sleep(delay_time);
+
+  write(fd, str, sizeof(str));
+  pthread_exit(NULL);
+}
+
+void blockUser(char argv[MAX_NOME]){
+  char name_to_block[MAX_NOME]; strcpy(name_to_block, "");
+  int i=0;
+  printf("Names: %s\n", names);
+  printf("name_to_block: %s\n", name_to_block);
+  printf("argv: %s\n", argv);
+  printf("Users:\n"); fflush(stdout);
+  char* tokens = strtok(names, "_");
+  printf("token %d: %s\n", i+1, tokens);
+  while(tokens!=NULL){
+    printf("Iteracao %d\n", i+2);
+    printf("\t%s\n", tokens); fflush(stdout);
+    tokens = strtok(NULL, "_");
+    i++;
+  }
+
+  while((strcmp(name_to_block, "")==0) || (strcmp(name_to_block, argv) == 0)){
+    printf("Bloquear que utilizador? ('exit' para cancelar): ");
+    fgets(name_to_block, MAX_NOME, stdin);
+    name_to_block[strlen(name_to_block)-1] = '\0';
+  }
+  tokens = strtok(names, "_");
+  while(tokens!=NULL){
+    if(strcmp(tokens, name_to_block) == 0){
+      add_to_block_list(head, name_to_block);
+      printf("Utilizador '%s' foi bloqueado.", name_to_block);
+      break;
+    }
   }
 }
 

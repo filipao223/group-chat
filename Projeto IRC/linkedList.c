@@ -47,3 +47,30 @@ void remove_from_list(client* head, int fd){
     current = next;
   }
 }
+
+void add_to_block_list(block_list* head, char nome[MAX_NOME]){
+  block_list* current, *last;
+
+  //Se for o primeiro block user
+  if(head->next == NULL){
+    head->next = malloc(sizeof(block_list));
+    strcpy(head->next->nome, nome);
+    head->next->next = NULL;
+  }
+  else{
+    //Não é o primeiro, percorre a lista até ao fim
+    for(current = head->next; current!=NULL; current = current->next) last = current;
+
+    last->next = malloc(sizeof(block_list));
+    strcpy(last->next->nome, nome);
+    last->next->next = NULL;
+  }
+}
+
+int check_block(block_list* head, char nome[MAX_NOME]){
+  block_list* current=NULL;
+  for(current = head->next; current!=NULL; current = current->next){
+    if(strcmp(current->nome, nome) == 0) return 1;
+  }
+  return 0;
+}
