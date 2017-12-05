@@ -168,7 +168,7 @@ void options(int esc, int server_fd){
   switch(esc){
     case 1:
       printf("Numero de mensagens a ver (entre 1 e 200): ");
-      int num;
+      int num = 0;
       while(num<=0 || num>200){
         scanf("%d", &num);
       }
