@@ -16,18 +16,16 @@
 
 void* writeMessages(void*);
 void* readMessages(void*);
-void* writeDelay(void*);
+//void* write_and_del(void*);
 void options(int, int);
 void blockUser(char*);
 void erro(char *msg);
 
 char bufOut[MAX_BUFFER];
 char names[MAX_BUFFER*MAX_NOME];
-char controlChar[1];
-int messageCount=0;
+int messageID=0;
 
 block_list* head_block = NULL;
-history* head_hist = NULL;
 
 pthread_t thread_read, thread_write, thread_delay;
 
@@ -64,10 +62,6 @@ int main(int argc, char *argv[]){
   head_block = malloc(sizeof(block_list));
   head_block->next = NULL;
 
-  //Inicia a lista do historico de mensagens
-  head_hist = malloc(sizeof(history));
-  head_hist->next = NULL;
-
   //Argumentos da thread para escrever mensganes
   thread_args_write* args = malloc(sizeof(thread_args_write));
   args->fd = *fd;
@@ -95,23 +89,22 @@ void* writeMessages(void* args){
   strcpy(argv, ptr->argv);
 
   while(1){
-    strcpy(controlChar, "0");
     fgets(buf, MAX_BUFFER, stdin);
     buf[strlen(buf)-1] = '\0';
 
     //Verifica se pretende fazer outras operaçoes
-    if(strcmp(buf, "command_history") == 0){
-      options(1, 0);
+    if(strcmp(buf, "/history") == 0){
+      options(1, server_fd);
     }
-    else if(strcmp(buf, "command_private") == 0){
+    else if(strcmp(buf, "/private") == 0){
       options(2, server_fd);
     }
-    else if(strcmp(buf, "command_delay") == 0){
+    else if(strcmp(buf, "/delay") == 0){
       options(3, server_fd);
     }
-    else if(strcmp(buf, "command_block") == 0){
+    else if(strcmp(buf, "/block") == 0){
       strcpy(names,"");
-      strcpy(bufOut, ""); strcat(bufOut, controlChar); strcat(bufOut, "_"); strcat(bufOut, "requestnames");
+      strcpy(bufOut, "0_"); strcat(bufOut, "requestnames");
 
       write(server_fd, bufOut, sizeof(bufOut));
       printf("Antes do read\n");
@@ -121,10 +114,8 @@ void* writeMessages(void* args){
       blockUser(argv);
     }
     else{
-      strcpy(bufOut, ""); //Para o servidor saber se a mensagem é privada ou nao
-      strcat(bufOut, controlChar); //Control char é 0 se nao for, 1 se for
-      strcat(bufOut, "_"); //servidor tera que fazer splits, se for privada, faz mais um split do que se nao for
-      strcat(bufOut, buf);
+      strcpy(bufOut, "0_"); //Para o servidor saber se a mensagem é privada ou nao
+      strcat(bufOut, buf); //servidor tera que fazer splits, se for privada, faz mais um split do que se nao for
 
       write(server_fd, bufOut, sizeof(bufOut));
       //Verifica se pretende acabar a conexao
@@ -139,10 +130,11 @@ void* writeMessages(void* args){
 
 void* readMessages(void* fd){
   int* server_fd = (int*) fd;
-  char bufIn[MAX_BUFFER+MAX_NOME], temp[MAX_BUFFER+MAX_NOME];
+  char bufIn[(MAX_BUFFER+MAX_NOME)*MAX_MESSAGES], temp[(MAX_BUFFER+MAX_NOME)*MAX_MESSAGES];
 
   while(1){
-    read(*server_fd, bufIn, sizeof(bufIn));
+    int nread = read(*server_fd, bufIn, sizeof(bufIn));
+    bufIn[nread] = '\0';
     strcpy(temp, bufIn);
 
     //Verifica se o user esta bloqueado
@@ -153,8 +145,8 @@ void* readMessages(void* fd){
 
     printf("%s\n", bufIn);
     //Adiciona ao historico de mensagens
-    add_to_history(head_hist, bufIn, messageCount);
-    messageCount++;
+    //add_to_history(head_hist, bufIn, messageID);
+    //messageID++;
   }
 }
 
@@ -164,6 +156,8 @@ void options(int esc, int server_fd){
   char message[MAX_BUFFER+MAX_NOME];
   int delay_time=-1;
   char temp[2];
+  char temp_num_msg[10];
+  char request_history[50];
 
   switch(esc){
     case 1:
@@ -172,13 +166,13 @@ void options(int esc, int server_fd){
       while(num<=0 || num>200){
         scanf("%d", &num);
       }
-      print_history(head_hist, num);
-      printf("Fim do historico\n");
+      strcpy(request_history, "0_/history_");
+      sprintf(temp_num_msg, "%d", num);
+      strcat(request_history, temp_num_msg);
+      write(server_fd, request_history, sizeof(request_history));
       break;
 
     case 2:
-      strcpy(controlChar, "1");
-
       printf("Nome do destinatario: ");
       fgets(nomeDest, MAX_NOME, stdin);
       nomeDest[strlen(nomeDest)-1]= '\0';
@@ -186,9 +180,7 @@ void options(int esc, int server_fd){
       fgets(buf, MAX_BUFFER, stdin);
       buf[strlen(buf)-1]= '\0';
 
-      strcpy(message, "");
-      strcat(message, controlChar);
-      strcat(message, "_");
+      strcpy(message, "1_");
       strcat(message, buf);
       strcat(message, "_");
       strcat(message, nomeDest);
@@ -197,7 +189,7 @@ void options(int esc, int server_fd){
       break;
 
     case 3:
-      printf("Tempo: ");
+      /*printf("Tempo: ");
       while(delay_time<1){
           fgets(temp, 10, stdin);
           sscanf(temp, "%d", &delay_time);
@@ -213,12 +205,12 @@ void options(int esc, int server_fd){
       strcpy(args->str, buf);
 
       pthread_create(&thread_delay, 0, writeDelay, (void*) args);
-      pthread_join(thread_delay, 0);
+      pthread_join(thread_delay, 0);*/
       break;
   }
 }
 
-void* writeDelay(void* args){
+/*void* write_and_del(void* args){
   thread_args_delay *ptr = (thread_args_delay*) args;
   int delay_time = ptr->seconds;
   int fd = ptr->fd;
@@ -229,7 +221,7 @@ void* writeDelay(void* args){
 
   write(fd, str, sizeof(str));
   pthread_exit(NULL);
-}
+}*/
 
 void blockUser(char argv[MAX_NOME]){
   char name_to_block[MAX_NOME]; strcpy(name_to_block, "");
@@ -240,6 +232,7 @@ void blockUser(char argv[MAX_NOME]){
   printf("Users:\n"); fflush(stdout);
   char* tokens = strtok(names, "_");
   printf("token %d: %s\n", i+1, tokens);
+
   while(tokens!=NULL){
     printf("Iteracao %d\n", i+2);
     printf("\t%s\n", tokens); fflush(stdout);

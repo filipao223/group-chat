@@ -110,13 +110,19 @@ void remove_from_history(history* head, int number){
   }
 }
 
-void print_history(history* head, int number){
+char* print_history(history* head, int number){
   history* current;
   int cont=0;
+  char *strToReturn = malloc((MAX_NOME+MAX_BUFFER)*MAX_MESSAGES);
+  char temp[MAX_BUFFER+MAX_NOME];
+  strToReturn[0] = '\0';
 
   for(current = head->next; current!=NULL; current = current->next){
     if(cont == number) break;
-
-    printf("%s\n", current->message);
+    sprintf(temp, "%s", current->message);
+    strcat(strToReturn, temp);
+    cont++;
   }
+  strcat(strToReturn, "Fim do historico");
+  return strToReturn;
 }

@@ -18,6 +18,9 @@
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
+history* head_list;
+int messageID=0;
+
 void* acceptClient(void*);
 void erro(char *msg);
 void sendToAll(client*, client*, int, char*);
@@ -40,13 +43,15 @@ int main(int argc, char *argv[]){
   signal(SIGINT, cleanup);
   struct sockaddr_in addr, client_addr;
 
-  //Cria cabeça da lista ligada
+  //Cria cabeça das listas ligadas
   client* head = malloc(sizeof(client));
+  head->next = NULL;
   client* current;
+  history* head_list = malloc(sizeof(history));
+  head->next = NULL;
 
   thread_args *args = malloc(sizeof(thread_args));
 
-  head->next = NULL;
   int fd;
 
   //ID's das threads
@@ -75,25 +80,20 @@ int main(int argc, char *argv[]){
   int nread,close_client=0;
   while(1){
     fd_set read_set;
+
     //Espera que haja pelo menos um cliente
-    #ifndef DEBUG
-    printf("A entrar no ciclo de head->next!=null\n");
-    #endif
     while(1){
       if(head->next != NULL) break;
       sleep(2);
     }
+
     close_client=0;
     current = NULL;
     FD_ZERO(&read_set);
-    #ifndef DEBUG
-    printf("Ciclo dos FD_SET's\n");
-    #endif
+
     for(current = head->next; current->next!=NULL; current = current->next) FD_SET(current->fd, &read_set);
     FD_SET(current->fd, &read_set);
-    #ifndef DEBUG
-    printf("A entrar no select\n");
-    #endif
+
     if(select(current->fd+1, &read_set,0,0,0) > 0){
       for(current = head->next; current!=NULL; current = current->next){
         if(FD_ISSET(current->fd, &read_set)){
@@ -124,40 +124,38 @@ int main(int argc, char *argv[]){
               close_client=1;
               break;
               }
-            else if(strcmp(tokens, "requestnames") == 0){
+            else if(strcmp(tokens, "requestnames") == 0){ //Cliente fez pedido da lista de users
               printf("Names Requested\n");
               requestNames(head, current->fd);
               break;
             }
+            else if(strcmp(tokens, "/history") == 0){ //Utilizador pediu o historico
+              int num; //Numero de mensagens
+              tokens = strtok(NULL, "_");
+              sscanf(tokens, "%d", &num);
+              char *strToReturn = print_history(head_list, num);
+              write(current->fd, strToReturn, (MAX_NOME+MAX_BUFFER)*MAX_MESSAGES);
+              free(strToReturn);
+              strToReturn=NULL;
+              break;
+            }
             else{
-              printf("%s: %s\n", current->nome, tokens);
-              sendToAll(head, current, current->fd, tokens);
+              printf("%s: %s\n", current->nome, tokens); //Escreve no terminal
+              char strTemp[MAX_BUFFER+MAX_NOME]; sprintf(strTemp, "%s: %s\n", current->nome, tokens); //Formata nome e mensagem numa string
+              add_to_history(head_list, strTemp, messageID);
+              messageID++;
+              sendToAll(head, current, current->fd, tokens); //Envia para todos
               break;
             }
           }
         }
       }
     }
-    #ifndef DEBUG
-    printf("Saiu do select\n");
-    #endif
+
     if(close_client == 1){
-      #ifndef DEBUG
-      printf("Tentando fechar\n");
-      #endif
       close(current->fd);
-      #ifndef DEBUG
-      printf("Fechou\n");
-      printf("Tenta clr\n");
-      #endif
       FD_CLR(current->fd, &read_set);
-      #ifndef DEBUG
-      printf("Tenta remover da lista\n");
-      #endif
       remove_from_list(head, current->fd);
-      #ifndef DEBUG
-      printf("Removeu da lista\n");
-      #endif
     }
   }
 }

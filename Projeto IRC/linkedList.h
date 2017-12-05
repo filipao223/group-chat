@@ -11,6 +11,6 @@ int check_block(block_list*, char*);
 
 void add_to_history(history*, char*, int);
 void remove_from_history(history*, int);
-void print_history(history*, int);
+char* print_history(history*, int);
 
 #endif //LINKEDLIST_H

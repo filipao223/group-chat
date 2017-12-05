@@ -4,7 +4,7 @@
 #define SERVER_PORT 9000
 #define MAX_BUFFER 1024
 #define MAX_CLIENTS 10
-#define MAX_NOME 256
+#define MAX_NOME 50
 #define MAX_MESSAGES 200
 
 //Lista ligada
