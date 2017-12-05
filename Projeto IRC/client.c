@@ -22,14 +22,14 @@ void blockUser(char*);
 void erro(char *msg);
 
 char bufOut[MAX_BUFFER];
-char messageHistory[MAX_MESSAGES][MAX_BUFFER];
 char names[MAX_BUFFER*MAX_NOME];
 char controlChar[1];
 int messageCount=0;
 
-pthread_t thread_read, thread_write, thread_delay;
+block_list* head_block = NULL;
+history* head_hist = NULL;
 
-block_list* head = NULL;
+pthread_t thread_read, thread_write, thread_delay;
 
 int main(int argc, char *argv[]){
   char endServer[100];
@@ -61,8 +61,12 @@ int main(int argc, char *argv[]){
   write(*fd, argv[3], sizeof(argv[3]));
 
   //Inicia a lista de utilizadores bloqueados
-  head = malloc(sizeof(block_list));
-  head->next = NULL;
+  head_block = malloc(sizeof(block_list));
+  head_block->next = NULL;
+
+  //Inicia a lista do historico de mensagens
+  head_hist = malloc(sizeof(history));
+  head_hist->next = NULL;
 
   //Argumentos da thread para escrever mensganes
   thread_args_write* args = malloc(sizeof(thread_args_write));
@@ -144,11 +148,12 @@ void* readMessages(void* fd){
     //Verifica se o user esta bloqueado
     char* tokens = strtok(temp, ":");
     if(tokens!=NULL){
-      if(check_block(head, tokens) == 1) continue;
+      if(check_block(head_block, tokens) == 1) continue;
     }
 
     printf("%s\n", bufIn);
-    strcpy(messageHistory[messageCount], bufIn); //Adiciona ao historico de mensagens
+    //Adiciona ao historico de mensagens
+    add_to_history(head_hist, bufIn, messageCount);
     messageCount++;
   }
 }
@@ -167,10 +172,7 @@ void options(int esc, int server_fd){
       while(num<=0 || num>200){
         scanf("%d", &num);
       }
-      for(int i=0; i<messageCount; i++){
-        if(i==num) break;
-        printf("%s\n", messageHistory[i]);
-      }
+      print_history(head_hist, num);
       printf("Fim do historico\n");
       break;
 
@@ -253,7 +255,7 @@ void blockUser(char argv[MAX_NOME]){
   tokens = strtok(names, "_");
   while(tokens!=NULL){
     if(strcmp(tokens, name_to_block) == 0){
-      add_to_block_list(head, name_to_block);
+      add_to_block_list(head_block, name_to_block);
       printf("Utilizador '%s' foi bloqueado.", name_to_block);
       break;
     }

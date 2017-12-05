@@ -35,4 +35,10 @@ typedef struct thread_args_msg_write{
   char argv[MAX_NOME];
 }thread_args_write;
 
+typedef struct history_node{
+  int messageNumber;
+  char message[MAX_BUFFER+MAX_NOME];
+  struct history_node* next;
+}history;
+
 #endif //STRUCTS_H

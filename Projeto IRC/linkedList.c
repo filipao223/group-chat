@@ -74,3 +74,49 @@ int check_block(block_list* head, char nome[MAX_NOME]){
   }
   return 0;
 }
+
+void add_to_history(history* head, char message[MAX_NOME+MAX_BUFFER], int messageNumber){
+  history *current, *last;
+
+  //Se for a primeira mensagem
+  if(head->next == NULL){
+    head->next = malloc(sizeof(history));
+    head->messageNumber = messageNumber;
+    strcpy(head->message, message);
+    head->next->next = NULL;
+  }
+  else{
+    //Não é o primeiro, percorre a lista até ao fim
+    for(current = head->next; current!=NULL; current = current->next) last = current;
+
+    last->next = malloc(sizeof(history));
+    last->messageNumber = messageNumber;
+    strcpy(last->message, message);
+    last->next->next = NULL;
+  }
+}
+
+void remove_from_history(history* head, int number){
+  history* current, *previous = head, *next = head->next->next;
+
+  for(current = head->next; current!=NULL; next = current->next){
+    if(current->messageNumber == number){
+      previous->next = next;
+      free(current);
+      break;
+    }
+    previous = current;
+    current = next;
+  }
+}
+
+void print_history(history* head, int number){
+  history* current;
+  int cont=0;
+
+  for(current = head->next; current!=NULL; current = current->next){
+    if(cont == number) break;
+
+    printf("%s\n", current->message);
+  }
+}
