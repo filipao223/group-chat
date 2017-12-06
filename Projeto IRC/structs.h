@@ -20,10 +20,10 @@ typedef struct thread_args_accept{
   client* head;
 }thread_args;
 
-typedef struct thread_args_msg_delay{
-  int fd, seconds;
-  char str[MAX_BUFFER];
-}thread_args_delay;
+typedef struct thread_args_msg_timed{
+  int sleep_time, messageID;
+  struct history_node* head;
+}thread_args_timed;
 
 typedef struct block_list_node{
   char nome[MAX_NOME];

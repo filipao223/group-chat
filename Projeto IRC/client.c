@@ -99,7 +99,7 @@ void* writeMessages(void* args){
     else if(strcmp(buf, "/private") == 0){
       options(2, server_fd);
     }
-    else if(strcmp(buf, "/delay") == 0){
+    else if(strcmp(buf, "/timed") == 0){
       options(3, server_fd);
     }
     else if(strcmp(buf, "/block") == 0){
@@ -158,6 +158,7 @@ void options(int esc, int server_fd){
   char temp[2];
   char temp_num_msg[10];
   char request_history[50];
+  char temp_sleep[6];
 
   switch(esc){
     case 1:
@@ -189,7 +190,7 @@ void options(int esc, int server_fd){
       break;
 
     case 3:
-      /*printf("Tempo: ");
+      printf("Tempo: ");
       while(delay_time<1){
           fgets(temp, 10, stdin);
           sscanf(temp, "%d", &delay_time);
@@ -198,14 +199,11 @@ void options(int esc, int server_fd){
       fgets(buf, MAX_BUFFER, stdin);
       buf[strlen(buf)-1] = '\0';
 
-      thread_args_delay* args = malloc(sizeof(thread_args_delay));
+      strcpy(message, "0_/timed_");
+      strcat(message, buf); strcat(message, "_"); sprintf(temp_sleep, "%d", delay_time);
+      strcat(message, temp_sleep);
 
-      args->fd = server_fd;
-      args->seconds = delay_time;
-      strcpy(args->str, buf);
-
-      pthread_create(&thread_delay, 0, writeDelay, (void*) args);
-      pthread_join(thread_delay, 0);*/
+      write(server_fd, message, sizeof(message));
       break;
   }
 }

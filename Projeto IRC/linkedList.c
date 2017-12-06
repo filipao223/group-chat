@@ -81,8 +81,8 @@ void add_to_history(history* head, char message[MAX_NOME+MAX_BUFFER], int messag
   //Se for a primeira mensagem
   if(head->next == NULL){
     head->next = malloc(sizeof(history));
-    head->messageNumber = messageNumber;
-    strcpy(head->message, message);
+    head->next->messageNumber = messageNumber;
+    strcpy(head->next->message, message);
     head->next->next = NULL;
   }
   else{
@@ -90,17 +90,17 @@ void add_to_history(history* head, char message[MAX_NOME+MAX_BUFFER], int messag
     for(current = head->next; current!=NULL; current = current->next) last = current;
 
     last->next = malloc(sizeof(history));
-    last->messageNumber = messageNumber;
-    strcpy(last->message, message);
+    last->next->messageNumber = messageNumber;
+    strcpy(last->next->message, message);
     last->next->next = NULL;
   }
 }
 
-void remove_from_history(history* head, int number){
+void remove_from_history(history* head, int messageID){
   history* current, *previous = head, *next = head->next->next;
 
   for(current = head->next; current!=NULL; next = current->next){
-    if(current->messageNumber == number){
+    if(current->messageNumber == messageID){
       previous->next = next;
       free(current);
       break;

@@ -28,16 +28,13 @@ void* sendToOne(client*, client*, char*, int, char*);
 void requestNames(client*, int);
 
 void cleanup(int signum){
-  /*client* current, *next;
-  for(current = head->next; next!=NULL;){ //Limpa memoria
-    next = current->next;
-    free(current);
-  }*/
   printf("\n\nA fechar servidor\n\n");
   sleep(1);
   pthread_mutex_destroy(&mutex);
   exit(0);
 }
+
+void* timed_message(void*);
 
 int main(int argc, char *argv[]){
   signal(SIGINT, cleanup);
@@ -55,7 +52,7 @@ int main(int argc, char *argv[]){
   int fd;
 
   //ID's das threads
-  pthread_t thread_id[MAX_CLIENTS], accept_thread;
+  pthread_t accept_thread, timed_thread;
 
   bzero((void *) &addr, sizeof(addr));
 
@@ -118,17 +115,20 @@ int main(int argc, char *argv[]){
           else{
             tokens= strtok(NULL, "_");
             if(tokens==NULL) break;
+
             //Não é privada
             if(strcmp(tokens, "exit") == 0){
               printf("%s terminou conexao.\n", current->nome);
               close_client=1;
               break;
-              }
+            }
+
             else if(strcmp(tokens, "requestnames") == 0){ //Cliente fez pedido da lista de users
               printf("Names Requested\n");
               requestNames(head, current->fd);
               break;
             }
+
             else if(strcmp(tokens, "/history") == 0){ //Utilizador pediu o historico
               int num; //Numero de mensagens
               tokens = strtok(NULL, "_");
@@ -139,6 +139,30 @@ int main(int argc, char *argv[]){
               strToReturn=NULL;
               break;
             }
+
+            else if(strcmp(tokens, "/timed") == 0){ //Mensagem temporaria
+              thread_args_timed* args_timed = malloc(sizeof(thread_args_timed));
+              int sleep_time=0;
+
+              tokens = strtok(NULL, "_");
+              printf("%s: %s\n", current->nome, tokens); //Escreve no terminal
+
+              char strTemp[MAX_BUFFER+MAX_NOME]; sprintf(strTemp, "%s: %s\n", current->nome, tokens); //Formata nome e mensagem numa string
+              add_to_history(head_list, strTemp, messageID);
+              messageID++;
+
+              tokens = strtok(NULL, "_");
+              sscanf(tokens, "%d", &sleep_time);
+
+              sendToAll(head, current, current->fd, tokens); //Envia para todos
+
+              args_timed->sleep_time = sleep_time;
+              args_timed->messageID = messageID-1;
+              args_timed->head = head_list;
+              pthread_create(&timed_thread, 0, timed_message, (void*) args_timed);
+              break;
+            }
+
             else{
               printf("%s: %s\n", current->nome, tokens); //Escreve no terminal
               char strTemp[MAX_BUFFER+MAX_NOME]; sprintf(strTemp, "%s: %s\n", current->nome, tokens); //Formata nome e mensagem numa string
@@ -211,6 +235,14 @@ void requestNames(client* head, int fd){
     if(current->next != NULL) strcat(names, "_");
   }
   write(fd, names, sizeof(names));
+}
+
+void* timed_message(void* args){
+  thread_args_timed* args_timed = (thread_args_timed*)args;
+
+  sleep(args_timed->sleep_time);
+  remove_from_history(args_timed->head, args_timed->messageID);
+  pthread_exit(NULL);
 }
 
 void erro(char *msg)
