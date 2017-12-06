@@ -16,7 +16,6 @@
 
 void* writeMessages(void*);
 void* readMessages(void*);
-//void* write_and_del(void*);
 void options(int, int);
 void blockUser(char*);
 void erro(char *msg);
@@ -73,9 +72,9 @@ int main(int argc, char *argv[]){
 
   //Thread para ler mensagens
   pthread_create(&thread_read, 0, readMessages, (void*) fd);
-  pthread_join(thread_write, 0);
+  pthread_join(thread_read, 0);
 
-  printf("A fechar conexao.");
+  printf("Servidor desligou.\n");
   close(*fd);
 
   exit(0);
@@ -119,7 +118,7 @@ void* writeMessages(void* args){
 
       write(server_fd, bufOut, sizeof(bufOut));
       //Verifica se pretende acabar a conexao
-      if(strcmp(bufOut, "0_exit") == 0){
+      if(strcmp(bufOut, "0_/exit") == 0){
         printf("A sair\n");
         pthread_kill(thread_read, SIGTERM);
         pthread_exit(NULL);
@@ -134,6 +133,7 @@ void* readMessages(void* fd){
 
   while(1){
     int nread = read(*server_fd, bufIn, sizeof(bufIn));
+    if(nread == 0) break;
     bufIn[nread] = '\0';
     strcpy(temp, bufIn);
 
@@ -144,10 +144,9 @@ void* readMessages(void* fd){
     }
 
     printf("%s\n", bufIn);
-    //Adiciona ao historico de mensagens
-    //add_to_history(head_hist, bufIn, messageID);
-    //messageID++;
   }
+
+  pthread_exit(NULL);
 }
 
 void options(int esc, int server_fd){
@@ -208,41 +207,23 @@ void options(int esc, int server_fd){
   }
 }
 
-/*void* write_and_del(void* args){
-  thread_args_delay *ptr = (thread_args_delay*) args;
-  int delay_time = ptr->seconds;
-  int fd = ptr->fd;
-  char str[MAX_BUFFER];
-  strcpy(str, ptr->str);
-
-  sleep(delay_time);
-
-  write(fd, str, sizeof(str));
-  pthread_exit(NULL);
-}*/
-
 void blockUser(char argv[MAX_NOME]){
   char name_to_block[MAX_NOME]; strcpy(name_to_block, "");
-  int i=0;
-  printf("Names: %s\n", names);
-  printf("name_to_block: %s\n", name_to_block);
-  printf("argv: %s\n", argv);
-  printf("Users:\n"); fflush(stdout);
   char* tokens = strtok(names, "_");
-  printf("token %d: %s\n", i+1, tokens);
 
+  //Escreve os nomes no ecrã
   while(tokens!=NULL){
-    printf("Iteracao %d\n", i+2);
     printf("\t%s\n", tokens); fflush(stdout);
     tokens = strtok(NULL, "_");
-    i++;
   }
 
+  //Pede um nome de utilizador para ser bloqueado, tem de ser diferente do utilizador
   while((strcmp(name_to_block, "")==0) || (strcmp(name_to_block, argv) == 0)){
     printf("Bloquear que utilizador? ('exit' para cancelar): ");
     fgets(name_to_block, MAX_NOME, stdin);
     name_to_block[strlen(name_to_block)-1] = '\0';
   }
+
   tokens = strtok(names, "_");
   while(tokens!=NULL){
     if(strcmp(tokens, name_to_block) == 0){

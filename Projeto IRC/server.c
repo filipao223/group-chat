@@ -21,6 +21,8 @@ pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 history* head_list;
 int messageID=0;
 
+fd_set read_set;
+
 void* acceptClient(void*);
 void erro(char *msg);
 void sendToAll(client*, client*, int, char*);
@@ -29,6 +31,7 @@ void requestNames(client*, int);
 
 void cleanup(int signum){
   printf("\n\nA fechar servidor\n\n");
+  FD_ZERO(&read_set);
   sleep(1);
   pthread_mutex_destroy(&mutex);
   exit(0);
@@ -76,7 +79,6 @@ int main(int argc, char *argv[]){
   char str[MAX_BUFFER];
   int nread,close_client=0;
   while(1){
-    fd_set read_set;
 
     //Espera que haja pelo menos um cliente
     while(1){
@@ -117,7 +119,7 @@ int main(int argc, char *argv[]){
             if(tokens==NULL) break;
 
             //Não é privada
-            if(strcmp(tokens, "exit") == 0){
+            if(strcmp(tokens, "/exit") == 0){
               printf("%s terminou conexao.\n", current->nome);
               close_client=1;
               break;
