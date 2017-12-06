@@ -78,6 +78,7 @@ int main(int argc, char *argv[]){
   //Select
   char str[MAX_BUFFER];
   int nread,close_client=0;
+
   while(1){
 
     //Espera que haja pelo menos um cliente
@@ -86,6 +87,10 @@ int main(int argc, char *argv[]){
       sleep(2);
     }
 
+    struct timeval timeout;
+    timeout.tv_sec = 2; //Quantos segundos o select espera até voltar a fazer loop
+    timeout.tv_usec = 0;
+
     close_client=0;
     current = NULL;
     FD_ZERO(&read_set);
@@ -93,7 +98,7 @@ int main(int argc, char *argv[]){
     for(current = head->next; current->next!=NULL; current = current->next) FD_SET(current->fd, &read_set);
     FD_SET(current->fd, &read_set);
 
-    if(select(current->fd+1, &read_set,0,0,0) > 0){
+    if(select(current->fd+1, &read_set, 0, 0, &timeout) > 0){
       for(current = head->next; current!=NULL; current = current->next){
         if(FD_ISSET(current->fd, &read_set)){
           nread = read(current->fd, str, sizeof(str));
