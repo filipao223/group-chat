@@ -55,7 +55,7 @@ int main(int argc, char *argv[]){
   if( connect(*fd,(struct sockaddr *)&addr,sizeof (addr)) < 0) erro("Connect");
   printf("Conectado.\n");
 
-  write(*fd, argv[3], sizeof(argv[3]));
+  write(*fd, argv[3], strlen(argv[3])+1);
 
   //Inicia a lista de utilizadores bloqueados
   head_block = malloc(sizeof(block_list));
@@ -103,22 +103,20 @@ void* writeMessages(void* args){
     }
     else if(strcmp(buf, "/block") == 0){
       strcpy(names,"");
-      strcpy(bufOut, "0_"); strcat(bufOut, "requestnames");
+      strcpy(bufOut, ""); strcat(bufOut, "requestnames");
 
-      write(server_fd, bufOut, sizeof(bufOut));
-      printf("Antes do read\n");
-      read(server_fd, names, sizeof(names));
-      printf("Depois do read\n");
+      write(server_fd, bufOut, strlen(bufOut)+1); //Pede ao servidor os nomes
+      read(server_fd, names, sizeof(names)); //Recebe do servidor os nomes
 
-      blockUser(argv);
+      blockUser(argv[3]);
     }
     else{
-      strcpy(bufOut, "0_"); //Para o servidor saber se a mensagem é privada ou nao
+      strcpy(bufOut, ""); //Limpa a string
       strcat(bufOut, buf); //servidor tera que fazer splits, se for privada, faz mais um split do que se nao for
 
-      write(server_fd, bufOut, sizeof(bufOut));
+      write(server_fd, bufOut, strlen(bufOut)+1);
       //Verifica se pretende acabar a conexao
-      if(strcmp(bufOut, "0_/exit") == 0){
+      if(strcmp(bufOut, "/exit") == 0){
         printf("A sair\n");
         pthread_kill(thread_read, SIGTERM);
         pthread_exit(NULL);
@@ -160,19 +158,19 @@ void options(int esc, int server_fd){
   char temp_sleep[6];
 
   switch(esc){
-    case 1:
+    case 1: //historico
       printf("Numero de mensagens a ver (entre 1 e 200): ");
       int num = 0;
       while(num<=0 || num>200){
         scanf("%d", &num);
       }
-      strcpy(request_history, "0_/history_");
+      strcpy(request_history, "/history_");
       sprintf(temp_num_msg, "%d", num);
       strcat(request_history, temp_num_msg);
-      write(server_fd, request_history, sizeof(request_history));
+      write(server_fd, request_history, strlen(request_history)+1);
       break;
 
-    case 2:
+    case 2: //Mensagem privada
       printf("Nome do destinatario: ");
       fgets(nomeDest, MAX_NOME, stdin);
       nomeDest[strlen(nomeDest)-1]= '\0';
@@ -180,15 +178,15 @@ void options(int esc, int server_fd){
       fgets(buf, MAX_BUFFER, stdin);
       buf[strlen(buf)-1]= '\0';
 
-      strcpy(message, "1_");
+      strcpy(message, "/private_");
       strcat(message, buf);
       strcat(message, "_");
       strcat(message, nomeDest);
 
-      write(server_fd, message, sizeof(message));
+      write(server_fd, message, strlen(message)+1);
       break;
 
-    case 3:
+    case 3: //Mensagem com timer
       printf("Tempo: ");
       while(delay_time<1){
           fgets(temp, 10, stdin);
@@ -198,11 +196,11 @@ void options(int esc, int server_fd){
       fgets(buf, MAX_BUFFER, stdin);
       buf[strlen(buf)-1] = '\0';
 
-      strcpy(message, "0_/timed_");
+      strcpy(message, "/timed_");
       strcat(message, buf); strcat(message, "_"); sprintf(temp_sleep, "%d", delay_time);
       strcat(message, temp_sleep);
 
-      write(server_fd, message, sizeof(message));
+      write(server_fd, message, strlen(message)+1);
       break;
   }
 }

@@ -108,7 +108,8 @@ int main(int argc, char *argv[]){
           tokens = strtok(str, "_");
           if(tokens == NULL) break;
 
-          if(strcmp(tokens, "1")==0){
+          //Cliente pretende enviar mensagem privada
+          if(strcmp(tokens, "/private")==0){
             //Conversa privada
             tokens = strtok(NULL, "_");
             char strToSend[MAX_BUFFER];
@@ -119,71 +120,70 @@ int main(int argc, char *argv[]){
             sendToOne(head, current, nomeDest, current->fd, strToSend);
             break;
           }
+
+          //Cliente pretende sair
+          else if(strcmp(tokens, "/exit") == 0){
+            printf("%s terminou conexao.\n", current->nome);
+            close_client=1;
+            break;
+          }
+
+          //Cliente pretende saber os nomes de todos os utilizadores
+          else if(strcmp(tokens, "requestnames") == 0){ //Cliente fez pedido da lista de users
+            printf("Names Requested\n");
+            requestNames(head, current->fd);
+            break;
+          }
+
+          //Cliente pretende receber o historico de mensagens
+          else if(strcmp(tokens, "/history") == 0){ //Utilizador pediu o historico
+            int num; //Numero de mensagens
+            tokens = strtok(NULL, "_");
+            sscanf(tokens, "%d", &num);
+            char *strToReturn = print_history(head_list, num);
+            write(current->fd, strToReturn, strlen(strToReturn)+1);
+            free(strToReturn);
+            strToReturn=NULL;
+            break;
+          }
+
+          //Cliente pretende enviar mensagem com tempo limite
+          else if(strcmp(tokens, "/timed") == 0){ //Mensagem temporaria
+            thread_args_timed* args_timed = malloc(sizeof(thread_args_timed));
+            int sleep_time=0;
+
+            tokens = strtok(NULL, "_");
+            printf("%s: %s\n", current->nome, tokens); //Escreve no terminal
+            sendToAll(head, current, current->fd, tokens); //Envia para todos
+
+            char strTemp[MAX_BUFFER+MAX_NOME]; sprintf(strTemp, "%s: %s\n", current->nome, tokens); //Formata nome e mensagem numa string
+            add_to_history(head_list, strTemp, messageID);
+            messageID++;
+
+            tokens = strtok(NULL, "_");
+            sscanf(tokens, "%d", &sleep_time);
+
+            args_timed->sleep_time = sleep_time;
+            args_timed->messageID = messageID-1;
+            args_timed->head = head_list;
+            pthread_create(&timed_thread, 0, timed_message, (void*) args_timed);
+            break;
+          }
+
+          //Cliente enviou uma mensagem normal
           else{
-            tokens= strtok(NULL, "_");
-            if(tokens==NULL) break;
-
-            //Não é privada
-            if(strcmp(tokens, "/exit") == 0){
-              printf("%s terminou conexao.\n", current->nome);
-              close_client=1;
-              break;
-            }
-
-            else if(strcmp(tokens, "requestnames") == 0){ //Cliente fez pedido da lista de users
-              printf("Names Requested\n");
-              requestNames(head, current->fd);
-              break;
-            }
-
-            else if(strcmp(tokens, "/history") == 0){ //Utilizador pediu o historico
-              int num; //Numero de mensagens
-              tokens = strtok(NULL, "_");
-              sscanf(tokens, "%d", &num);
-              char *strToReturn = print_history(head_list, num);
-              write(current->fd, strToReturn, (MAX_NOME+MAX_BUFFER)*MAX_MESSAGES);
-              free(strToReturn);
-              strToReturn=NULL;
-              break;
-            }
-
-            else if(strcmp(tokens, "/timed") == 0){ //Mensagem temporaria
-              thread_args_timed* args_timed = malloc(sizeof(thread_args_timed));
-              int sleep_time=0;
-
-              tokens = strtok(NULL, "_");
-              printf("%s: %s\n", current->nome, tokens); //Escreve no terminal
-
-              char strTemp[MAX_BUFFER+MAX_NOME]; sprintf(strTemp, "%s: %s\n", current->nome, tokens); //Formata nome e mensagem numa string
-              add_to_history(head_list, strTemp, messageID);
-              messageID++;
-
-              tokens = strtok(NULL, "_");
-              sscanf(tokens, "%d", &sleep_time);
-
-              sendToAll(head, current, current->fd, tokens); //Envia para todos
-
-              args_timed->sleep_time = sleep_time;
-              args_timed->messageID = messageID-1;
-              args_timed->head = head_list;
-              pthread_create(&timed_thread, 0, timed_message, (void*) args_timed);
-              break;
-            }
-
-            else{
-              printf("%s: %s\n", current->nome, tokens); //Escreve no terminal
-              char strTemp[MAX_BUFFER+MAX_NOME]; sprintf(strTemp, "%s: %s\n", current->nome, tokens); //Formata nome e mensagem numa string
-              add_to_history(head_list, strTemp, messageID);
-              messageID++;
-              sendToAll(head, current, current->fd, tokens); //Envia para todos
-              break;
-            }
+            printf("%s: %s\n", current->nome, tokens); //Escreve no terminal
+            char strTemp[MAX_BUFFER+MAX_NOME]; sprintf(strTemp, "%s: %s\n", current->nome, tokens); //Formata nome e mensagem numa string
+            add_to_history(head_list, strTemp, messageID);
+            messageID++;
+            sendToAll(head, current, current->fd, tokens); //Envia para todos
+            break;
           }
         }
       }
     }
 
-    if(close_client == 1){
+    if(close_client == 1){ //Verifica se o cliente terminou conexao, para o remover da lista
       close(current->fd);
       FD_CLR(current->fd, &read_set);
       remove_from_list(head, current->fd);
@@ -201,11 +201,11 @@ void* acceptClient(void* args){
   int fd;
   while(1){
     fd = accept(args_ptr->fd, (struct sockaddr*)&client_addr, (socklen_t*)&client_addr_size);
-    int nread = read(fd, nome, sizeof(nome));
+    int nread = read(fd, nome, sizeof(nome)); //Cliente ao ser conectado, envia logo o seu nome
     nome[nread]= '\0';
     printf("Novo cliente conectado - %s\n", nome);
     pthread_mutex_lock(&mutex);
-    add_to_list(args_ptr->head, fd, nome, client_addr);
+    add_to_list(args_ptr->head, fd, nome, client_addr); //Adiciona-o na lista
     pthread_mutex_unlock(&mutex);
   }
 }
@@ -216,7 +216,7 @@ void sendToAll(client* head, client* user, int fd, char str[MAX_BUFFER]){
   sprintf(message,"%s: %s", user->nome, str);
   for(current = head->next; current!=NULL; current = current->next){
     if(current->fd == fd) continue;
-    write(current->fd, message, sizeof(message));
+    write(current->fd, message, strlen(message)+1);
   }
 }
 
@@ -227,7 +227,7 @@ void* sendToOne(client* head, client* user, char dest[MAX_NOME], int fd, char st
   for(current = head->next; current!=NULL; current = current->next){
     if(current->fd == fd) continue;
     if(strcmp(current->nome, dest) == 0){
-      write(current->fd, message, sizeof(message));
+      write(current->fd, message, strlen(message)+1);
       return 0;
     }
   }
