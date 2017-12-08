@@ -41,7 +41,7 @@ void* timed_message(void*);
 
 int main(int argc, char *argv[]){
   signal(SIGINT, cleanup);
-  struct sockaddr_in addr, client_addr;
+  struct sockaddr_in addr;
 
   //Cria cabeça das listas ligadas
   client* head_client = malloc(sizeof(client));
@@ -76,10 +76,10 @@ int main(int argc, char *argv[]){
   //Thread que vai aceitar os clientes
   pthread_create(&accept_thread, 0, acceptClient, (void*)args);
 
-  //Select
   char str[MAX_BUFFER];
   int nread,close_client=0;
 
+  //Ciclo que vai ler as mensagens dos utilizadores
   while(1){
 
     //Espera que haja pelo menos um cliente
@@ -96,17 +96,18 @@ int main(int argc, char *argv[]){
     current = NULL;
     FD_ZERO(&read_set);
 
+    //Coloca os descritores dos clientes no set de leitura
     for(current = head_client->next; current->next!=NULL; current = current->next) FD_SET(current->fd, &read_set);
     FD_SET(current->fd, &read_set);
 
     if(select(current->fd+1, &read_set, 0, 0, &timeout) > 0){
-      for(current = head_client->next; current!=NULL; current = current->next){
+      for(current = head_client->next; current!=NULL; current = current->next){ //Percorre a lista de clientes
         if(FD_ISSET(current->fd, &read_set)){
           nread = read(current->fd, str, sizeof(str));
           str[nread] = '\0';
 
           char *tokens;
-          tokens = strtok(str, "_");
+          tokens = strtok(str, "_"); //Vai separar a string recebida do cliente (p.ex.: /private_ola_antonio)
           if(tokens == NULL) break;
           //Identifica o que o cliente pretende fazer
 
@@ -114,26 +115,26 @@ int main(int argc, char *argv[]){
           if(strcmp(tokens, "/private")==0){
             //Conversa privada
             tokens = strtok(NULL, "_");
-            char strToSend[MAX_BUFFER];
+            char strToSend[MAX_BUFFER]; //A mensagem que o cliente pretende enviar
             strcpy(strToSend, tokens);
             tokens = strtok(NULL, "_");
-            char nomeDest[MAX_NOME];
+            char nomeDest[MAX_NOME]; //O Utilizador para o qual é destinada a mensagem
             strcpy(nomeDest, tokens);
-            sendToOne(head_client, current, nomeDest, current->fd, strToSend);
+            sendToOne(head_client, current, nomeDest, current->fd, strToSend); //Envia
             break;
           }
 
           //Cliente pretende sair
           else if(strcmp(tokens, "/exit") == 0){
             printf("%s terminou conexao.\n", current->nome);
-            close_client=1;
+            close_client=1; //Valor que vai determinar fora do ciclo se o cliente saiu ou não
             break;
           }
 
           //Cliente pretende saber os nomes de todos os utilizadores
           else if(strcmp(tokens, "requestnames") == 0){ //Cliente fez pedido da lista de users
             printf("Names Requested\n");
-            requestNames(head_client, current->fd);
+            requestNames(head_client, current->fd); //Funçao coloca todos os nomes numa string e envia ao cliente
             break;
           }
 
@@ -141,17 +142,17 @@ int main(int argc, char *argv[]){
           else if(strcmp(tokens, "/history") == 0){ //Utilizador pediu o historico
             int num; //Numero de mensagens
             tokens = strtok(NULL, "_");
-            sscanf(tokens, "%d", &num);
-            char *strToReturn = print_history(head_list, num);
-            write(current->fd, strToReturn, strlen(strToReturn)+1);
-            free(strToReturn);
+            sscanf(tokens, "%d", &num); //Numero de mensagens a mostrar
+            char *strToReturn = print_history(head_list, num); //Funçao coloca todas as mensagens recebidas numa string
+            write(current->fd, strToReturn, strlen(strToReturn)+1); //Envia para o cliente
+            free(strToReturn); //Liberta a memoria alocada em print_history()
             strToReturn=NULL;
             break;
           }
 
           //Cliente pretende enviar mensagem com tempo limite
           else if(strcmp(tokens, "/timed") == 0){ //Mensagem temporaria
-            thread_args_timed* args_timed = malloc(sizeof(thread_args_timed));
+            thread_args_timed* args_timed = malloc(sizeof(thread_args_timed)); //Argumentos passados a thread que vai ser criada
             int sleep_time=0;
 
             tokens = strtok(NULL, "_");
@@ -159,11 +160,11 @@ int main(int argc, char *argv[]){
             sendToAll(head_client, current, current->fd, tokens); //Envia para todos
 
             char strTemp[MAX_BUFFER+MAX_NOME]; sprintf(strTemp, "%s: %s\n", current->nome, tokens); //Formata nome e mensagem numa string
-            add_to_history(head_list, strTemp, messageID);
-            messageID++;
+            add_to_history(head_list, strTemp, messageID); //Adiciona ao historico
+            messageID++; //ID único da mensagem
 
             tokens = strtok(NULL, "_");
-            sscanf(tokens, "%d", &sleep_time);
+            sscanf(tokens, "%d", &sleep_time); //Quanto tempo a mensagem permanece no historico
 
             args_timed->sleep_time = sleep_time;
             args_timed->messageID = messageID-1;
@@ -186,9 +187,8 @@ int main(int argc, char *argv[]){
     }
 
     if(close_client == 1){ //Verifica se o cliente terminou conexao, para o remover da lista
-      close(current->fd);
-      FD_CLR(current->fd, &read_set);
-      remove_from_list(head_client, current->fd);
+      close(current->fd); //Fecha o socket do cliente
+      remove_from_list(head_client, current->fd); //Remove-o da lista de clientes
     }
   }
 }
@@ -215,10 +215,10 @@ void* acceptClient(void* args){
 void sendToAll(client* head, client* user, int fd, char str[MAX_BUFFER]){
   client* current;
   char message[MAX_BUFFER];
-  sprintf(message,"%s: %s", user->nome, str);
-  for(current = head->next; current!=NULL; current = current->next){
-    if(current->fd == fd) continue;
-    write(current->fd, message, strlen(message)+1);
+  sprintf(message,"%s: %s", user->nome, str); //Formata a string com o nome do utilizador que mandou e a sua mensagem
+  for(current = head->next; current!=NULL; current = current->next){ //Percorre a lista de clientes
+    if(current->fd == fd) continue; //Impede de mandar a mensagem para o propio utilizador
+    write(current->fd, message, strlen(message)+1); //Envia
   }
 }
 
@@ -228,7 +228,7 @@ void* sendToOne(client* head, client* user, char dest[MAX_NOME], int fd, char st
   sprintf(message, "P %s: %s", user->nome, str);
   for(current = head->next; current!=NULL; current = current->next){
     if(current->fd == fd) continue;
-    if(strcmp(current->nome, dest) == 0){
+    if(strcmp(current->nome, dest) == 0){ //Procura o Utilizador a quem é destinada a mensagem
       write(current->fd, message, strlen(message)+1);
       return 0;
     }
@@ -240,7 +240,7 @@ void requestNames(client* head, int fd){
   char names[MAX_BUFFER*MAX_NOME]; strcpy(names, "");
   client* current=NULL;
   for(current = head->next; current!=NULL; current = current->next){
-    strcat(names, current->nome);
+    strcat(names, current->nome); //Concatena os nomes numa string, separados por "_"
     if(current->next != NULL) strcat(names, "_");
   }
   write(fd, names, sizeof(names));

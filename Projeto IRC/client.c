@@ -85,13 +85,13 @@ void* writeMessages(void* args){
   int server_fd = ptr->fd;
   char buf[MAX_BUFFER];
   char argv[MAX_NOME];
-  strcpy(argv, ptr->argv);
+  strcpy(argv, ptr->argv); //Nome do utilizador, será usado em blockUser()
 
   while(1){
-    fgets(buf, MAX_BUFFER, stdin);
+    fgets(buf, MAX_BUFFER, stdin); //Recebe a mensagem do terminal
     buf[strlen(buf)-1] = '\0';
 
-    //Verifica se pretende fazer outras operaçoes
+    //Verifica se a mensagem é um comando
     if(strcmp(buf, "/history") == 0){
       options(1, server_fd);
     }
@@ -103,18 +103,18 @@ void* writeMessages(void* args){
     }
     else if(strcmp(buf, "/block") == 0){
       strcpy(names,"");
-      strcpy(bufOut, ""); strcat(bufOut, "requestnames");
+      strcpy(bufOut, "requestnames");
 
       write(server_fd, bufOut, strlen(bufOut)+1); //Pede ao servidor os nomes
       read(server_fd, names, sizeof(names)); //Recebe do servidor os nomes
 
-      blockUser(argv[3]);
+      blockUser(argv);
     }
     else{
-      strcpy(bufOut, ""); //Limpa a string
-      strcat(bufOut, buf); //servidor tera que fazer splits, se for privada, faz mais um split do que se nao for
+      strcpy(bufOut, buf);
 
       write(server_fd, bufOut, strlen(bufOut)+1);
+
       //Verifica se pretende acabar a conexao
       if(strcmp(bufOut, "/exit") == 0){
         printf("A sair\n");
@@ -130,7 +130,7 @@ void* readMessages(void* fd){
   char bufIn[(MAX_BUFFER+MAX_NOME)*MAX_MESSAGES], temp[(MAX_BUFFER+MAX_NOME)*MAX_MESSAGES];
 
   while(1){
-    int nread = read(*server_fd, bufIn, sizeof(bufIn));
+    int nread = read(*server_fd, bufIn, sizeof(bufIn)); //Lê do servidor
     if(nread == 0) break;
     bufIn[nread] = '\0';
     strcpy(temp, bufIn);
@@ -161,10 +161,10 @@ void options(int esc, int server_fd){
     case 1: //historico
       printf("Numero de mensagens a ver (entre 1 e 200): ");
       int num = 0;
-      while(num<=0 || num>200){
+      while(num<=0 || num>200){ //Limite de mensagens
         scanf("%d", &num);
       }
-      strcpy(request_history, "/history_");
+      strcpy(request_history, "/history_"); //Escreve o comando que vai enviar ao servidor
       sprintf(temp_num_msg, "%d", num);
       strcat(request_history, temp_num_msg);
       write(server_fd, request_history, strlen(request_history)+1);
@@ -174,6 +174,7 @@ void options(int esc, int server_fd){
       printf("Nome do destinatario: ");
       fgets(nomeDest, MAX_NOME, stdin);
       nomeDest[strlen(nomeDest)-1]= '\0';
+
       printf("Mensagem: ");
       fgets(buf, MAX_BUFFER, stdin);
       buf[strlen(buf)-1]= '\0';
@@ -186,7 +187,7 @@ void options(int esc, int server_fd){
       write(server_fd, message, strlen(message)+1);
       break;
 
-    case 3: //Mensagem com timer
+    case 3: //Mensagem com temporizador
       printf("Tempo: ");
       while(delay_time<1){
           fgets(temp, 10, stdin);
