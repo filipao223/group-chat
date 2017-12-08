@@ -44,11 +44,12 @@ int main(int argc, char *argv[]){
   struct sockaddr_in addr, client_addr;
 
   //Cria cabeça das listas ligadas
-  client* head = malloc(sizeof(client));
-  head->next = NULL;
+  client* head_client = malloc(sizeof(client));
+  head_client->next = NULL;
   client* current;
   history* head_list = malloc(sizeof(history));
-  head->next = NULL;
+  head_list->next = NULL;
+  head_list->previous = NULL;
 
   thread_args *args = malloc(sizeof(thread_args));
 
@@ -70,7 +71,7 @@ int main(int argc, char *argv[]){
   if( listen(fd, 5) < 0) erro("na funcao listen");
 
   args->fd = fd;
-  args->head = head;
+  args->head = head_client;
 
   //Thread que vai aceitar os clientes
   pthread_create(&accept_thread, 0, acceptClient, (void*)args);
@@ -83,7 +84,7 @@ int main(int argc, char *argv[]){
 
     //Espera que haja pelo menos um cliente
     while(1){
-      if(head->next != NULL) break;
+      if(head_client->next != NULL) break;
       sleep(2);
     }
 
@@ -95,11 +96,11 @@ int main(int argc, char *argv[]){
     current = NULL;
     FD_ZERO(&read_set);
 
-    for(current = head->next; current->next!=NULL; current = current->next) FD_SET(current->fd, &read_set);
+    for(current = head_client->next; current->next!=NULL; current = current->next) FD_SET(current->fd, &read_set);
     FD_SET(current->fd, &read_set);
 
     if(select(current->fd+1, &read_set, 0, 0, &timeout) > 0){
-      for(current = head->next; current!=NULL; current = current->next){
+      for(current = head_client->next; current!=NULL; current = current->next){
         if(FD_ISSET(current->fd, &read_set)){
           nread = read(current->fd, str, sizeof(str));
           str[nread] = '\0';
@@ -107,6 +108,7 @@ int main(int argc, char *argv[]){
           char *tokens;
           tokens = strtok(str, "_");
           if(tokens == NULL) break;
+          //Identifica o que o cliente pretende fazer
 
           //Cliente pretende enviar mensagem privada
           if(strcmp(tokens, "/private")==0){
@@ -117,7 +119,7 @@ int main(int argc, char *argv[]){
             tokens = strtok(NULL, "_");
             char nomeDest[MAX_NOME];
             strcpy(nomeDest, tokens);
-            sendToOne(head, current, nomeDest, current->fd, strToSend);
+            sendToOne(head_client, current, nomeDest, current->fd, strToSend);
             break;
           }
 
@@ -131,7 +133,7 @@ int main(int argc, char *argv[]){
           //Cliente pretende saber os nomes de todos os utilizadores
           else if(strcmp(tokens, "requestnames") == 0){ //Cliente fez pedido da lista de users
             printf("Names Requested\n");
-            requestNames(head, current->fd);
+            requestNames(head_client, current->fd);
             break;
           }
 
@@ -154,7 +156,7 @@ int main(int argc, char *argv[]){
 
             tokens = strtok(NULL, "_");
             printf("%s: %s\n", current->nome, tokens); //Escreve no terminal
-            sendToAll(head, current, current->fd, tokens); //Envia para todos
+            sendToAll(head_client, current, current->fd, tokens); //Envia para todos
 
             char strTemp[MAX_BUFFER+MAX_NOME]; sprintf(strTemp, "%s: %s\n", current->nome, tokens); //Formata nome e mensagem numa string
             add_to_history(head_list, strTemp, messageID);
@@ -176,7 +178,7 @@ int main(int argc, char *argv[]){
             char strTemp[MAX_BUFFER+MAX_NOME]; sprintf(strTemp, "%s: %s\n", current->nome, tokens); //Formata nome e mensagem numa string
             add_to_history(head_list, strTemp, messageID);
             messageID++;
-            sendToAll(head, current, current->fd, tokens); //Envia para todos
+            sendToAll(head_client, current, current->fd, tokens); //Envia para todos
             break;
           }
         }
@@ -186,7 +188,7 @@ int main(int argc, char *argv[]){
     if(close_client == 1){ //Verifica se o cliente terminou conexao, para o remover da lista
       close(current->fd);
       FD_CLR(current->fd, &read_set);
-      remove_from_list(head, current->fd);
+      remove_from_list(head_client, current->fd);
     }
   }
 }
