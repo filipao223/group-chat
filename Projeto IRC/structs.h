@@ -38,6 +38,7 @@ typedef struct thread_args_msg_write{
 typedef struct history_node{
   int messageNumber;
   char message[MAX_BUFFER+MAX_NOME];
+  struct history_node* previous;
   struct history_node* next;
 }history;
 
