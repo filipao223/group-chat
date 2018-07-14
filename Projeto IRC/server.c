@@ -16,6 +16,7 @@
 
 #include "structs.h"
 #include "linkedList.h"
+#include "log.h"
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
@@ -29,7 +30,7 @@ void erro(char *msg);
 void sendToAll(client*, client*, int, char*);
 void* sendToOne(client*, client*, char*, int, char*);
 void requestNames(client*, int);
-void log(char*);
+void* timed_message(void*);
 
 void cleanup(int signum){
   printf("\n\nA fechar servidor\n\n");
@@ -38,8 +39,6 @@ void cleanup(int signum){
   pthread_mutex_destroy(&mutex);
   exit(0);
 }
-
-void* timed_message(void*);
 
 int main(int argc, char *argv[]){
   signal(SIGINT, cleanup);
@@ -67,7 +66,7 @@ int main(int argc, char *argv[]){
   addr.sin_port = htons(SERVER_PORT);
 
   if ( (fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) erro("na funcao socket");
-  int var;
+  int var = 1;
   setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &var, sizeof(int));
   if ( bind(fd,(struct sockaddr*)&addr,sizeof(addr)) < 0) erro("na funcao bind");
   if( listen(fd, 5) < 0) erro("na funcao listen");
@@ -80,6 +79,12 @@ int main(int argc, char *argv[]){
 
   char str[MAX_BUFFER];
   int nread,close_client=0;
+
+  //Server start-up message
+  char* message_buffer = malloc(MAX_MESSAGE_BUFFER); //This will hold all temp log messages
+  log_msg("SERVER HAS STARTED", message_buffer);
+  printf("%s\n", message_buffer);
+  free(message_buffer);
 
   //Ciclo que vai ler as mensagens dos utilizadores
   while(1){
@@ -128,14 +133,24 @@ int main(int argc, char *argv[]){
 
           //Cliente pretende sair
           else if(strcmp(tokens, "/exit") == 0){
-            printf("%s terminou conexao.\n", current->nome);
+            //Log info
+            char *message_buffer = malloc(MAX_MESSAGE_BUFFER);
+            char *message_temp = malloc(MAX_MESSAGE_TEMP);
+            sprintf(message_temp, "%s ended connection.\n", current->nome);
+            log_msg(message_temp, message_buffer);
+            printf("%s", message_buffer); free(message_buffer); free(message_temp);
             close_client=1; //Valor que vai determinar fora do ciclo se o cliente saiu ou não
             break;
           }
 
           //Cliente pretende saber os nomes de todos os utilizadores
           else if(strcmp(tokens, "requestnames") == 0){ //Cliente fez pedido da lista de users
-            printf("Names Requested\n");
+            //Log action
+            char *message_buffer = malloc(MAX_MESSAGE_BUFFER);
+            char *message_temp = malloc(MAX_MESSAGE_TEMP);
+            sprintf(message_temp, "%s requested names\n", current->nome);
+            log_msg(message_temp, message_buffer);
+            printf("%s", message_buffer); free(message_temp); free(message_buffer);
             requestNames(head_client, current->fd); //Funçao coloca todos os nomes numa string e envia ao cliente
             break;
           }
@@ -145,6 +160,14 @@ int main(int argc, char *argv[]){
             int num; //Numero de mensagens
             tokens = strtok(NULL, "_");
             sscanf(tokens, "%d", &num); //Numero de mensagens a mostrar
+
+            //Log action
+            char* message_buffer = malloc(MAX_MESSAGE_BUFFER);
+            char* message_temp = malloc(MAX_MESSAGE_TEMP);
+            sprintf(message_temp, "%s requested history (%d messages)\n", current->nome, num);
+            log_msg(message_temp, message_buffer);
+            printf("%s", message_buffer); free(message_temp); free(message_buffer);
+
             char *strToReturn = print_history(head_list, num); //Funçao coloca todas as mensagens recebidas numa string
             write(current->fd, strToReturn, strlen(strToReturn)+1); //Envia para o cliente
             free(strToReturn); //Liberta a memoria alocada em print_history()
@@ -157,8 +180,22 @@ int main(int argc, char *argv[]){
             thread_args_timed* args_timed = malloc(sizeof(thread_args_timed)); //Argumentos passados a thread que vai ser criada
             int sleep_time=0;
 
+            //Log action
+            char *message_temp = malloc(MAX_MESSAGE_TEMP);
+            char *message_buffer = malloc(MAX_MESSAGE_BUFFER);
+            sprintf(message_temp, "%s wants to send timed message\n", current->nome);
+            log_msg(message_temp, message_buffer);
+            printf("%s", message_buffer); free(message_temp); free(message_buffer);
+
             tokens = strtok(NULL, "_");
-            printf("%s: %s\n", current->nome, tokens); //Escreve no terminal
+
+            //Log action
+            message_temp = malloc(MAX_MESSAGE_TEMP);
+            message_buffer = malloc(MAX_MESSAGE_BUFFER);
+            sprintf(message_temp, "%s: %s\n", current->nome, tokens);
+            log_msg(message_temp, message_buffer);
+            printf("%s", message_buffer); free(message_temp); free(message_buffer);
+
             sendToAll(head_client, current, current->fd, tokens); //Envia para todos
 
             char strTemp[MAX_BUFFER+MAX_NOME]; sprintf(strTemp, "%s: %s\n", current->nome, tokens); //Formata nome e mensagem numa string
@@ -177,7 +214,13 @@ int main(int argc, char *argv[]){
 
           //Cliente enviou uma mensagem normal
           else{
-            printf("%s: %s\n", current->nome, tokens); //Escreve no terminal
+            //Log action
+            char* message_temp = malloc(MAX_MESSAGE_TEMP);
+            char* message_buffer = malloc(MAX_MESSAGE_BUFFER);
+            sprintf(message_temp, "%s: %s\n", current->nome, tokens);
+            log_msg(message_temp, message_buffer);
+            printf("%s", message_buffer); free(message_temp); free(message_buffer);
+
             char strTemp[MAX_BUFFER+MAX_NOME]; sprintf(strTemp, "%s: %s\n", current->nome, tokens); //Formata nome e mensagem numa string
             add_to_history(head_list, strTemp, messageID);
             messageID++;
@@ -207,7 +250,14 @@ void* acceptClient(void* args){
     fd = accept(args_ptr->fd, (struct sockaddr*)&client_addr, (socklen_t*)&client_addr_size);
     int nread = read(fd, nome, sizeof(nome)); //Cliente ao ser conectado, envia logo o seu nome
     nome[nread]= '\0';
-    printf("Novo cliente conectado - %s\n", nome);
+
+    //Log information
+    char *message_buffer = malloc(MAX_MESSAGE_BUFFER);
+    char *message_temp = malloc(MAX_MESSAGE_TEMP);
+    sprintf(message_temp, "Novo cliente conectado - %s\n", nome);
+    log_msg(message_temp, message_buffer);
+    printf("%s", message_buffer); free(message_buffer); free(message_temp);
+
     pthread_mutex_lock(&mutex);
     add_to_list(args_ptr->head, fd, nome, client_addr); //Adiciona-o na lista
     pthread_mutex_unlock(&mutex);
@@ -256,12 +306,7 @@ void* timed_message(void* args){
   pthread_exit(NULL);
 }
 
-void erro(char *msg)
-{
+void erro(char *msg){
   printf("Erro: %s\n", msg);
   exit(-1);
-}
-
-void log(char* message){
-
 }

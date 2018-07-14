@@ -1,11 +1,29 @@
 #ifndef STRUCTS_H
 #define STRUCTS_H
 
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <netdb.h>
+#include <string.h>
+#include <signal.h>
+#include <fcntl.h>
+#include <pthread.h>
+#include <signal.h>
+#include <errno.h>
+#include <time.h>
+
 #define SERVER_PORT 9000
 #define MAX_BUFFER 1024
 #define MAX_CLIENTS 10
 #define MAX_NOME 50
 #define MAX_MESSAGES 200
+#define MAX_MESSAGE_BUFFER 500
+#define MAX_MESSAGE_TEMP 500
 
 //Lista ligada
 typedef struct client_node{
