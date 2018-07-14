@@ -12,6 +12,7 @@
 #include <pthread.h>
 #include <signal.h>
 #include <errno.h>
+#include <time.h>
 
 #include "structs.h"
 #include "linkedList.h"
@@ -28,6 +29,7 @@ void erro(char *msg);
 void sendToAll(client*, client*, int, char*);
 void* sendToOne(client*, client*, char*, int, char*);
 void requestNames(client*, int);
+void log(char*);
 
 void cleanup(int signum){
   printf("\n\nA fechar servidor\n\n");
@@ -258,4 +260,8 @@ void erro(char *msg)
 {
   printf("Erro: %s\n", msg);
   exit(-1);
+}
+
+void log(char* message){
+
 }
